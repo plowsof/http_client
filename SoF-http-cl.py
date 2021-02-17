@@ -12,17 +12,18 @@ from watchdog.events import PatternMatchingEventHandler
 import ntpath
 import requests
 import glob
-
+import win32gui 
+import win32con
 '''
 if getattr(sys, 'frozen', False):
 	application_path = os.path.dirname(sys.executable)
 	os.chdir(application_path)
 '''
-__http_func__ = os.path.join(os.getcwd(),"http.func")
-path_parent = os.path.dirname(os.getcwd())
-path_parent = os.path.dirname(path_parent)
-os.chdir(path_parent)
-print(os.getcwd())
+__http_func__ = os.path.join(os.getcwd(),"http-client","exe.win32-3.8","http.func")
+#path_parent = os.path.dirname(os.getcwd())
+#path_parent = os.path.dirname(path_parent)
+#os.chdir(path_parent)
+#print(os.getcwd())
 
 print('CWD: ' + os.getcwd())
 cl_version = "20210206"
@@ -88,19 +89,39 @@ def on_created(event):
 		with open(event.src_path, "r") as f:
 			x = f.readlines()
 		mapname = x[1].split()[2].replace("\"","").lower()
+		tmpfile = f"user/maps/{mapname}.tmp"
+		mapdir = f"user/maps/{mapname}.bsp"
+		if os.path.isfile(tmpfile):
+			os.remove(tmpfile)
 		url = __gitbase__ + mapname + ".zip"
 		print(url)
 		if download_url(url,"http_tmp_mapfiles.zip"):
-			#trigger disconnect via SoFplus find file
-			with open("user/sofplus/data/http_flist_exists", "w+") as f:
-				f.write("AeO<3")
+			#we can check if mapname.tmp exists after extraction
+			#then we dont need to disconnect :)
 			#extract/install files
 			with ZipFile('http_tmp_mapfiles.zip', 'r') as zipObj:
 			# Extract all the contents of zip file in different directory
 				zipObj.extractall('user')
-			#trigger reconnect via SoFplus find file
-			with open("user/sofplus/data/http_flist_finished", "w+") as f:
-				f.write("AeO<3")
+			#extraction finished. check if we need to reconnect
+			if os.path.isfile(tmpfile):
+				print("a temp file exists")
+				#if modified time of tmpfile > mapname.bsp
+				#then its another filetype e.g. mapname.eal + mapname.tmp
+				timetmp = os.path.getmtime(tmpfile)
+				timebsp = os.path.getmtime(mapdir)
+				print(f"tmp: {timetmp} bsp: {timebsp}")
+				if timetmp < timebsp:
+					os.remove(tmpfile)
+					#trigger disconnect via SoFplus find file
+					with open("user/sofplus/data/http_flist_exists", "w+") as f:
+						f.write("AeO<3")
+					time.sleep(0.260)
+					#trigger reconnect via SoFplus find file
+					with open("user/sofplus/data/http_flist_finished", "w+") as f:
+						f.write("AeO<3")
+			else:
+				print("no tmp file was created")
+			
 
 	elif fname == "http_done":
 		cleanup()
@@ -217,6 +238,33 @@ begin_wav = "str"
 end_wav = "str"
 ini_debug = "str"
 
+def sofWinEnumHandler( hwnd, ctx ):
+	global sofId
+	#C:\Users\Human\Desktop\Raven\SOF PLATINUM\http-client\exe.win32-3.8\SoF-http-cl.exe
+	#if win32gui.IsWindowVisible( hwnd ):
+	#print (hex(hwnd), win32gui.GetWindowText( hwnd ))
+	fname = ntpath.basename(win32gui.GetWindowText( hwnd ))
+	if fname == "SoF-http-cl.exe":
+		sofId = hwnd
+		win32gui.ShowWindow(sofId, win32con.SW_MINIMIZE)
+
+def searchForSoFWindow():
+	sofId = ""
+	while sofId == "":
+		print("cant find SoF,,, ill keep looking")
+		try:
+			win32gui.EnumWindows( sofWinEnumHandler, None )
+		except Exception as e:
+			print(e)
+			if e == KeyboardInterrupt:
+				
+				raise
+			pass
+		if sofId == "":
+			break
+			#time.sleep(2)
+	print("Found the SoF window")
+	return sofId
 
 def main():
 	cleanup()
@@ -226,6 +274,8 @@ def main():
 	#start observer thread
 	x = threading.Thread(target=start_observer)
 	x.start()
+	#minimise the terminal 
+	searchForSoFWindow()
 
 def check_http():
 	global loc_mm_http

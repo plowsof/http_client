@@ -128,7 +128,7 @@ function parse_find_map(~mapname)
 		sp_sc_flow_if text cvar http_exists_loop_busy == val 0
 		{
 			set http_exists_loop_busy 1
-			sp_sc_func_exec filelist_exists_loop
+			sp_sc_func_exec filelist_exists_loop $~mapname
 		}
 	}
 	else
@@ -142,7 +142,6 @@ function filelist_exists_loop(*)
 	//wait 20 seconds to download file
 	sp_sc_flow_if number cvar http_counter_exists < val 20000
 	{
-		sp_sc_cvar_list http_counter_exists
 		add http_counter_exists 250
 		sp_sc_func_exec filelist_exists
 		sset ~cmd sp_sc_func_exec filelist_exists_loop #~1
@@ -155,6 +154,7 @@ function filelist_exists(*)
 	sp_sc_file_find ~ls $~f file 
 	sp_sc_flow_if number cvar ~ls_0 == val 1
 	{
+		http_print File found. Downloading
 		disconnect
 		//stop loop
 		set http_counter_exists 20000
@@ -169,10 +169,19 @@ function filelist_exists(*)
 		
 		//"user/sofplus/addons/http_filelist_created.func"
 	}
-	else
+	//check if map is extracted early
+	sp_sc_flow_if text cvar ~1 != val "aeo<3"
 	{
-		echo "Debug: Flist:not existing"
+		sp_sc_cvar_sset ~f "maps/" $~1 ".bsp"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			//stop the loop so we stay connected
+			set http_exists_loop_busy 0
+			set http_counter_finished 1
+		}
 	}
+
 }
 
 function filelist_finished_loop(*)
@@ -191,6 +200,7 @@ function filelist_finished(*)
 	sp_sc_file_find ~ls $~f file 
 	sp_sc_flow_if number cvar ~ls_0 == val 1
 	{
+		http_print Download completed
 		reconnect
 		//stop loop
 		set http_counter_finished 1
@@ -221,6 +231,9 @@ function onch_download(~cvar)
 
 function http_sp2curl(~file)
 {
+	//very small eal files sometimes clash
+	//we download the eal, while sof1 tries to rename to .tmp ... 
+	//but failure to rename error happens. 
 	sp_sc_cvar_list ~file
 	set ~dir #~file
 	sp_sc_cvar_random_int ~rand 1 1000000
