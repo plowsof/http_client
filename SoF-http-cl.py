@@ -167,13 +167,18 @@ def checkFtp(fname,from_vault):
 def cleanup():
 	global spData
 	print("glib glob blobby")
-	for x in glob.glob(spData + "http_*"):
-		time.sleep(0.2)
-		os.remove(x)
-		#print(x)
-	for x in glob.glob("user/sofplus/addons/http_*"):
-		time.sleep(0.2)
-		os.remove(x)
+	while True:
+		try:
+			for x in glob.glob(spData + "http_*"):
+				os.remove(x)
+			for x in glob.glob("user/sofplus/addons/http_*"):
+				os.remove(x)
+			break
+			pass
+		except Exception as e:
+			raise e
+		time.sleep(0.1)
+
 
 def get_sp_sounds():
 	#security?
