@@ -111,7 +111,6 @@ def on_created(event):
 				timebsp = os.path.getmtime(mapdir)
 				print(f"tmp: {timetmp} bsp: {timebsp}")
 				if timetmp < timebsp:
-					os.remove(tmpfile)
 					#trigger disconnect via SoFplus find file
 					with open("user/sofplus/data/http_flist_exists", "w+") as f:
 						f.write("AeO<3")
@@ -119,6 +118,7 @@ def on_created(event):
 					#trigger reconnect via SoFplus find file
 					with open("user/sofplus/data/http_flist_finished", "w+") as f:
 						f.write("AeO<3")
+					os.remove(tmpfile)
 			else:
 				print("no tmp file was created")
 			
@@ -168,9 +168,11 @@ def cleanup():
 	global spData
 	print("glib glob blobby")
 	for x in glob.glob(spData + "http_*"):
+		time.sleep(0.2)
 		os.remove(x)
 		#print(x)
 	for x in glob.glob("user/sofplus/addons/http_*"):
+		time.sleep(0.2)
 		os.remove(x)
 
 def get_sp_sounds():
