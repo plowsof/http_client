@@ -186,7 +186,7 @@ def cleanup():
 			break
 			pass
 		except Exception as e:
-			raise e
+			print(e)
 		time.sleep(0.1)
 
 

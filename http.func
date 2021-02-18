@@ -82,6 +82,7 @@ function onch_state(~cvar)
 			sp_sc_cvar_save http_done ~l
 			set http_counter_finished 1
 			set http_counter_exists 20000
+			set _sp_cl_print 1
 		}
 	}
 	//possible fix
@@ -91,7 +92,6 @@ function onch_state(~cvar)
 
 function print_response(~data)
 {
-	echo "IN"
 	sp_sc_cvar_copy ~parse_me $~data
 	//ignore when we zero it
 	sp_sc_flow_if text cvar ~parse_me != val ""
