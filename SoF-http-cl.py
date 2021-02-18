@@ -14,6 +14,10 @@ import requests
 import glob
 import win32gui 
 import win32con
+
+
+from tqdm import tqdm
+
 '''
 if getattr(sys, 'frozen', False):
 	application_path = os.path.dirname(sys.executable)
@@ -95,7 +99,7 @@ def on_created(event):
 			os.remove(tmpfile)
 		url = __gitbase__ + mapname + ".zip"
 		print(url)
-		if download_url(url,"http_tmp_mapfiles.zip"):
+		if download(url,"http_tmp_mapfiles.zip"):
 			#we can check if mapname.tmp exists after extraction
 			#then we dont need to disconnect :)
 			#extract/install files
@@ -126,17 +130,23 @@ def on_created(event):
 	elif fname == "http_done":
 		cleanup()
 
-def download_url(url, save_path):
-	r = requests.get(url)
-	if r.status_code != 404:
-		with open(save_path, 'wb') as fd:
-			for chunk in r.iter_content(chunk_size=512):
-				if chunk:
-					fd.write(chunk)
+def download(url: str, fname: str):
+	resp = requests.get(url, stream=True)
+	fdesc = url.split("/")[-1]
+	if resp.status_code != 404:
+		total = int(resp.headers.get('content-length', 0))
+		with open(fname, 'wb') as file, tqdm(
+			desc=fdesc,
+			total=total,
+			unit='iB',
+			unit_scale=True,
+			unit_divisor=1024,
+		) as bar:
+			for data in resp.iter_content(chunk_size=1024):
+				size = file.write(data)
+				bar.update(size)
 		return True
 	else:
-		print(r)
-		print("FALSE error")
 		return False
 
 def checkFtp(fname,from_vault):

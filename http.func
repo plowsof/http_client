@@ -1,3 +1,22 @@
+//connect @ intermission
+//downloadcurrent map
+//'reconnect' - new map
+//not triggered 
+
+//Yep. Gotta include in the download.
+
+//Also these for the other maps just to prepare in advance. They are required.
+		
+	
+//Code:
+//- kb.sp
+//- pitia.sp
+//- ravened.sp
+//- rdam.sp
+//- rdam2.sp
+//- rdam3.sp
+
+//r&b dead zone wtf? wtf?
 function http_init()
 {
 	set _print_resp_wait 0
@@ -25,8 +44,23 @@ function http_init()
 // 8-Spawned into the map
 function onch_state(~cvar)
 {
+
 	sp_sc_cvar_copy ~state $~cvar
+	sp_sc_flow_if text cvar ~state != val ""
+	{
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+		sp_sc_cvar_list ~state
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+	}
+	sp_sc_flow_if number cvar ~state == val 1
+	{
+		set http_previous_mapcheck ""
+	}
 	//http_print $~cvar has changed to $~state
+	sp_sc_flow_if number cvar ~state == val 4
+	{
+		set ~state "7"
+	}
 	sp_sc_flow_if number cvar ~state == val "7"
 	{
 		zero cl_downloading
@@ -50,6 +84,8 @@ function onch_state(~cvar)
 			set http_counter_exists 20000
 		}
 	}
+	//possible fix
+	zero _sp_cl_info_state
 }
 
 
@@ -111,29 +147,33 @@ function parse_get_map(*)
 
 function parse_find_map(~mapname)
 {
-	echo Looking for $~mapname
-	sp_sc_cvar_sset ~dir "maps/" $~mapname ".bsp"
-	sp_sc_file_find ~ls $~dir pak filesystem file recursive
-	sp_sc_flow_if number cvar ~ls_0 == val 0
+	sp_sc_flow_if text cvar http_previous_mapcheck != val #~mapname
 	{
-		http_print We do not have: $~dir
-		//let the onch_download func handle it
-		//sp_sc_cvar_sset ~path "maps/" $~mapname ".bsp"
-		//set cl_download_filename $~path
-		//zero cl_downloading; set cl_downloading "Downloading File"
-		//new map file list
-		sp_sc_cvar_random_int ~rand 1 1000000
-		sp_sc_cvar_save http_mapname_$~rand ~mapname
-		set http_counter_exists 0
-		sp_sc_flow_if text cvar http_exists_loop_busy == val 0
+		set http_previous_mapcheck #~mapname
+		echo Looking for $~mapname
+		sp_sc_cvar_sset ~dir "maps/" $~mapname ".bsp"
+		sp_sc_file_find ~ls $~dir pak filesystem file recursive
+		sp_sc_flow_if number cvar ~ls_0 == val 0
 		{
-			set http_exists_loop_busy 1
-			sp_sc_func_exec filelist_exists_loop $~mapname
+			http_print We do not have: $~dir
+			//let the onch_download func handle it
+			//sp_sc_cvar_sset ~path "maps/" $~mapname ".bsp"
+			//set cl_download_filename $~path
+			//zero cl_downloading; set cl_downloading "Downloading File"
+			//new map file list
+			sp_sc_cvar_random_int ~rand 1 1000000
+			sp_sc_cvar_save http_mapname_$~rand ~mapname
+			set http_counter_exists 0
+			sp_sc_flow_if text cvar http_exists_loop_busy == val 0
+			{
+				set http_exists_loop_busy 1
+				sp_sc_func_exec filelist_exists_loop $~mapname
+			}
 		}
-	}
-	else
-	{
-		http_print We have: $~dir
+		else
+		{
+			http_print We have: $~dir
+		}
 	}
 }
 
@@ -201,6 +241,9 @@ function filelist_finished(*)
 	sp_sc_flow_if number cvar ~ls_0 == val 1
 	{
 		http_print Download completed
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+		echo "reconnect triggered!"
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
 		reconnect
 		//stop loop
 		set http_counter_finished 1
