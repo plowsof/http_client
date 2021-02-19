@@ -14,7 +14,7 @@ import requests
 import glob
 import win32gui 
 import win32con
-
+import subprocess
 #skin 1 or higher
 #its custom ghoul
 
@@ -32,10 +32,11 @@ __http_func__ = os.path.join(os.getcwd(),"http-client","exe.win32-3.8","http.fun
 #print(os.getcwd())
 
 print('CWD: ' + os.getcwd())
-cl_version = "20210206"
+cl_version = "20210219"
 print("Version: %s" % cl_version)
 dir_path = os.getcwd()
 
+versionUrl = "https://raw.githubusercontent.com/plowsof/http_client/main/version.txt"
 loc_mm_http = os.path.join(dir_path,"user/sofplus/addons/http.func")
 __ftpbase__ = "http://sofmaps.byethost8.com/base/"
 __cookie_name__ = "__test"
@@ -77,7 +78,6 @@ def on_modified(event):
 				#probably 1 line , but just in case
 				lines = f.readlines()
 				for line in lines:
-					print(line)
 					if "cmd baselines" in line:
 						with open("user/sofplus/data/http_block_download", "w+") as f:
 							f.write("AeO<3")
@@ -322,22 +322,40 @@ def searchForSoFWindow():
 			#time.sleep(2)
 	print("Found the SoF window")
 	return sofId
+def versionCheck():
+	global versionUrl
+	global cl_version
+	resp = requests.get(versionUrl, stream=True)
+	line = resp.iter_lines()
+	for x in line:
+		version = x.decode('ascii')
+	if version == cl_version:
+		return True
+	else:
+		#version mismatch, warn user
+		print("Please download/extract new zip @ https://github.com/plowsof/http_client")
+		q = input("Ignore and start SoF.exe anyway? Y/N: ")
+		if q.lower() == 'yes' or q.lower() == 'y':
+			return True
 
 def main():
 	global log_seek
-	if not os.path.isfile("user/sof.log"):
-		with open("user/sof.log", "w+") as f:
-			f.write("AeO<3\n")
-	log_seek = os.path.getsize("user/sof.log")
-	cleanup()
-	#copy http.func to addons if we dont have it
-	check_http()
-	#get_sp_sounds()
-	#start observer thread
-	x = threading.Thread(target=start_observer)
-	x.start()
-	#minimise the terminal 
-	searchForSoFWindow()
+	if versionCheck():
+		if not os.path.isfile("user/sof.log"):
+			with open("user/sof.log", "w+") as f:
+				f.write("AeO<3\n")
+		log_seek = os.path.getsize("user/sof.log")
+		cleanup()
+		#copy http.func to addons if we dont have it
+		check_http()
+		#get_sp_sounds()
+		#start observer thread
+		x = threading.Thread(target=start_observer)
+		x.start()
+		#minimise the terminal 
+		searchForSoFWindow()
+		subprocess.Popen('SoF.exe')
+
 
 def check_http():
 	global loc_mm_http

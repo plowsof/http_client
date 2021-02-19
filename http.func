@@ -58,6 +58,8 @@ function onch_state(~cvar)
 	sp_sc_flow_if number cvar ~state == val 1
 	{
 		set http_previous_mapcheck ""
+		set ~l ""
+		sp_sc_cvar_save http_done ~l
 	}
 	//http_print $~cvar has changed to $~state
 	sp_sc_flow_if number cvar ~state == val 4
