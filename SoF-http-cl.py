@@ -15,6 +15,8 @@ import glob
 import win32gui 
 import win32con
 
+#skin 1 or higher
+#its custom ghoul
 
 from tqdm import tqdm
 
@@ -56,12 +58,31 @@ try:
 except:
 	pass 
 
+check_stufftext = 0
+log_seek = 0
+
 base_url = __ftpbase__
 sp_sounds = base_url + "sp_sounds.txt"
 cookies = {__cookie_name__: __cookie_val__}
 spData = os.path.join(".","user/sofplus/data/")
 
 
+def on_modified(event):
+	global log_seek
+	global check_stufftext
+	if check_stufftext == 1:
+		if "sof.log" in event.src_path:
+			with open(event.src_path, "r") as f:
+				f.seek(log_seek)
+				#probably 1 line , but just in case
+				lines = f.readlines()
+				for line in lines:
+					print(line)
+					if "cmd baselines" in line:
+						with open("user/sofplus/data/http_block_download", "w+") as f:
+							f.write("AeO<3")
+						check_stufftext = 0
+				log_seek = os.path.getsize(event.src_path)
 
 def on_created(event):
 	global cookies
@@ -131,9 +152,18 @@ def on_created(event):
 		cleanup()
 
 def download(url: str, fname: str):
+	global check_stufftext, log_seek
 	resp = requests.get(url, stream=True)
 	fdesc = url.split("/")[-1]
 	if resp.status_code != 404:
+		#file exists - wait to complete download.
+		print("SUCCESS - file exists")
+		log_seek = os.path.getsize("user/sof.log")
+		check_stufftext = 1
+		with open("user/sofplus/data/http_zip_exists", "w+") as f:
+			f.write("AeO<3")
+		#to simulate slow download speeds
+		#time.sleep(60)
 		total = int(resp.headers.get('content-length', 0))
 		with open(fname, 'wb') as file, tqdm(
 			desc=fdesc,
@@ -145,8 +175,13 @@ def download(url: str, fname: str):
 			for data in resp.iter_content(chunk_size=1024):
 				size = file.write(data)
 				bar.update(size)
+		with open("user/sofplus/data/http_zip_done","w+") as f:
+			f.write("AeO<3")
+		check_stufftext = 0
 		return True
 	else:
+		with open("user/sofplus/data/http_zip_not_exists", "w+") as f:
+			f.write("AeO<3")
 		return False
 
 def checkFtp(fname,from_vault):
@@ -176,6 +211,7 @@ def checkFtp(fname,from_vault):
 
 def cleanup():
 	global spData
+	time.sleep(0.2)
 	print("glib glob blobby")
 	while True:
 		try:
@@ -213,7 +249,6 @@ def get_sp_sounds():
 def start_observer():
 	print("hello world im the observer")
 	global spData
-	cleanup()
 	#patterns not working for me
 	patterns = "*"
 	ignore_patterns = ""
@@ -221,15 +256,20 @@ def start_observer():
 	case_sensitive = True
 	my_event_handler = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
 
-	#my_event_handler.on_modified = on_modified
+	
 	my_event_handler.on_created = on_created
 
 	path = spData
 	go_recursively = True
 	my_observer = Observer()
 	my_observer.schedule(my_event_handler, path, recursive=go_recursively)
-
 	my_observer.start()
+	my_event_handler_2 = PatternMatchingEventHandler(patterns, ignore_patterns, ignore_directories, case_sensitive)
+	my_event_handler_2.on_modified = on_modified
+	my_observer_2 = Observer()
+
+	my_observer_2.schedule(my_event_handler_2, os.path.join(".","user/"), recursive=go_recursively)
+	my_observer_2.start()
 	#myAddTextWrapper("http_print Activated!\n",1)
 	try:
 		while True:
@@ -284,6 +324,11 @@ def searchForSoFWindow():
 	return sofId
 
 def main():
+	global log_seek
+	if not os.path.isfile("user/sof.log"):
+		with open("user/sof.log", "w+") as f:
+			f.write("AeO<3\n")
+	log_seek = os.path.getsize("user/sof.log")
 	cleanup()
 	#copy http.func to addons if we dont have it
 	check_http()

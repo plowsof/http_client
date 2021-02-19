@@ -3,6 +3,8 @@
 //'reconnect' - new map
 //not triggered 
 
+//HTTP_DONE_RANDOM
+
 //Yep. Gotta include in the download.
 
 //Also these for the other maps just to prepare in advance. They are required.
@@ -16,9 +18,10 @@
 //- rdam2.sp
 //- rdam3.sp
 
-//r&b dead zone wtf? wtf?
+
 function http_init()
 {
+	set logfile 2
 	set _print_resp_wait 0
 	set _http_downloading 0
 	//get <mapname> only quicker
@@ -163,17 +166,64 @@ function parse_find_map(~mapname)
 			//new map file list
 			sp_sc_cvar_random_int ~rand 1 1000000
 			sp_sc_cvar_save http_mapname_$~rand ~mapname
-			set http_counter_exists 0
-			sp_sc_flow_if text cvar http_exists_loop_busy == val 0
-			{
-				set http_exists_loop_busy 1
-				sp_sc_func_exec filelist_exists_loop $~mapname
-			}
+			set zip_exists_loop_gate 1
+			set developer 3
+			sp_sc_func_exec zip_exists_loop $~mapname
 		}
 		else
 		{
 			http_print We have: $~dir
 		}
+	}
+}
+
+function zip_exists_loop(~mapname)
+{
+	sp_sc_flow_if number cvar zip_exists_loop_gate == val 1
+	{
+		sset ~cmd "sp_sc_func_exec zip_exists_loop" #~mapname
+		sp_sc_timer 10 #~cmd
+		sp_sc_func_exec zip_exists #~mapname
+	}
+}
+
+function zip_exists(~mapname)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_zip_exists"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		//Python script is now scanning logfile for 'stufftext' lines
+		//We must set net_receiverate to 0.1 if python creates a 'doit' file
+		sp_sc_cvar_sset ~f "sofplus/data/http_block_download"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			//block download
+			set net_receiverate 0.01
+			set net_sendrate 0.01
+		}
+		sp_sc_cvar_sset ~f "sofplus/data/http_zip_done"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			set developer 0
+			//resume connecting
+			set net_receiverate 1
+			set net_sendrate 1
+			//stop loop
+			set zip_exists_loop_gate 0
+			http_print $~mapname finished downloading.
+		}
+	}
+	//
+	sp_sc_cvar_sset ~f "sofplus/data/http_zip_not_exists"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		//stop the loop, no zip to download
+		set zip_exists_loop_gate 0
+		http_print No zip file exists
 	}
 }
 
@@ -188,6 +238,7 @@ function filelist_exists_loop(*)
 		sp_sc_timer 250 #~cmd
 	}
 }
+
 function filelist_exists(*)
 {
 	sp_sc_cvar_sset ~f "sofplus/data/http_flist_exists"
@@ -261,6 +312,7 @@ function onch_download(~cvar)
 	sp_sc_flow_if text cvar ~x == val "Downloading File"
 	{
 		//stop any 2 loops running
+		//we could be downloading the <hugemap>.zip still
 		set http_counter_exists 20000
 		set http_counter_finished 20000
 		set http_finished_loop_busy 0
