@@ -1,0 +1,395 @@
+//connect @ intermission
+//downloadcurrent map
+//'reconnect' - new map
+//not triggered 
+
+//HTTP_DONE_RANDOM
+
+//Yep. Gotta include in the download.
+
+//Also these for the other maps just to prepare in advance. They are required.
+		
+	
+//Code:
+//- kb.sp
+//- pitia.sp
+//- ravened.sp
+//- rdam.sp
+//- rdam2.sp
+//- rdam3.sp
+
+
+function http_init()
+{
+	set logfile 2
+	set _print_resp_wait 0
+	set _http_downloading 0
+	//get <mapname> only quicker
+	//serverstatus 5.135.46.179:28916
+	//only our onchange print is showns
+	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_info_state "onch_state"
+	sp_sc_func_exec spf_sc_list_onchange_add_func _sp_cl_print_data "print_response"
+	//sp_sc_on_change cl_downloading onch_download
+
+	sp_sc_func_alias http_print http_print
+	sp_sc_func_alias http_sp2curl http_sp2curl
+
+	sp_sc_func_alias quick quick
+
+	set http_exists_loop_busy 0
+	set http_finished_loop_busy 0
+
+	//python script will delete this file (to show we're in http mode)
+	set ~l "AeO<3"
+	sp_sc_cvar_save http_is_running ~l
+}
+
+// 1-Not connected
+// 2-Attempting to connect to a server
+// 4-(Re)connecting to a server
+// 7-Loading map
+// 8-Spawned into the map
+function onch_state(~cvar)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_is_running"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 0
+	{
+		//tell server we can download via http not udp (slow)
+		sp_sc_flow_if text cvar cl_http_version == val ""
+		{
+			sp_sc_func_load_file sofplus/addons/version_http_cl.func
+			sp_sc_func_exec version_http_cl_init
+		}
+		sp_sc_cvar_copy ~state $~cvar
+		sp_sc_flow_if number cvar ~state == val 1
+		{
+			set http_previous_mapcheck ""
+			set ~l ""
+			sp_sc_cvar_save http_done ~l
+		}
+		//http_print $~cvar has changed to $~state
+		sp_sc_flow_if number cvar ~state == val 4
+		{
+			set ~state "7"
+		}
+		sp_sc_flow_if number cvar ~state == val "7"
+		{
+			zero cl_downloading
+			http_print "began loading map!"
+			sp_sc_cvar_list _sp_cl_info_server
+			//check the mapname early from serverstatus
+			zero _sp_cl_print_data 
+			set _print_resp_wait 1
+			set _sp_cl_print 3
+			echo "do status"
+			serverstatus $_sp_cl_info_server
+		}
+		else
+		{
+			sp_sc_flow_if number cvar ~state == val "8"
+			{
+				//we spawned in game, trigger cleanup()
+				set ~l ""
+				sp_sc_cvar_save http_done ~l
+				set http_counter_finished 1
+				set http_counter_exists 40000
+				set _sp_cl_print 1
+
+			}
+		}
+		//possible fix
+		zero _sp_cl_info_state
+	}
+}
+
+
+function print_response(~data)
+{
+	sp_sc_cvar_copy ~parse_me $~data
+	//ignore when we zero it
+	sp_sc_flow_if text cvar ~parse_me != val ""
+	{
+		sp_sc_flow_if number cvar _print_resp_wait == val 1
+		{
+			//maybe 'busy' is a better name.. 0 when finished?
+			set _print_resp_wait 0
+			sp_sc_flow_if number cvar http_busy == val 0
+			{
+				echo "not busy downloading"
+				//we're waiting for a response
+				sp_sc_cvar_replace ~noquote ~parse_me %22: 
+				sp_sc_func_exec parse_get_map #~noquote
+			}
+			else
+			{
+				http_print "We're busy downloading a file: already"
+			}
+		}
+	}
+}
+
+function parse_get_map(*)
+{
+	//complains sometimes about multiple args e.g. an extra " somewhere
+	set ~data #~1
+	set ~parse #~data
+	//sset ~msg "%03%03Parse this:%02" #~parse
+	//sp_sc_cvar_unescape ~msg ~msg
+	//echo #~msg
+	sp_sc_cvar_substr ~char ~parse 0 1
+	sp_sc_flow_if text cvar ~char == val "\"
+	{
+		set _sp_cl_print 1
+		//it's serverinfo, split + find mapname
+		sp_sc_cvar_split ~serverinfo "\" ~parse
+		set ~counter 1
+		sp_sc_flow_while number cvar ~counter <= cvar ~serverinfo_0
+		{
+			sp_sc_flow_if text cvar ~serverinfo_$~counter == val "mapname"
+			{
+				set ~tmp $~counter;add ~tmp 1
+				sp_sc_cvar_copy ~mapname ~serverinfo_$~tmp
+				//set ~serverinfo_0 0, or:
+				add ~serverinfo_0 -$~serverinfo_0
+			}
+			add ~counter 1
+		}
+		sp_sc_func_exec parse_find_map $~mapname
+	}
+}
+
+function parse_find_map(~mapname)
+{
+	sp_sc_flow_if text cvar http_previous_mapcheck != val #~mapname
+	{
+		set http_previous_mapcheck #~mapname
+		echo Looking for $~mapname
+		sp_sc_cvar_sset ~dir "maps/" $~mapname ".bsp"
+		sp_sc_file_find ~ls $~dir pak filesystem file recursive
+		sp_sc_flow_if number cvar ~ls_0 == val 0
+		{
+			http_print We do not have: $~dir
+			//let the onch_download func handle it
+			//sp_sc_cvar_sset ~path "maps/" $~mapname ".bsp"
+			//set cl_download_filename $~path
+			//zero cl_downloading; set cl_downloading "Downloading File"
+			//new map file list
+			sp_sc_cvar_random_int ~rand 1 1000000
+			sp_sc_cvar_save http_mapname_$~rand ~mapname
+			set zip_exists_loop_gate 1
+			set developer 3
+			sp_sc_func_exec zip_exists_loop $~mapname
+		}
+		else
+		{
+			http_print We have: $~dir
+		}
+	}
+}
+
+function zip_exists_loop(~mapname)
+{
+	sp_sc_flow_if number cvar zip_exists_loop_gate == val 1
+	{
+		sset ~cmd "sp_sc_func_exec zip_exists_loop" #~mapname
+		sp_sc_timer 10 #~cmd
+		sp_sc_func_exec zip_exists #~mapname
+	}
+}
+
+function zip_exists(~mapname)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_zip_exists"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		//Python script is now scanning logfile for 'stufftext' lines
+		//We must set net_receiverate to 0.1 if python creates a 'doit' file
+		sp_sc_cvar_sset ~f "sofplus/data/http_block_download"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			//block download
+			set net_receiverate 0.01
+			set net_sendrate 0.01
+		}
+		sp_sc_cvar_sset ~f "sofplus/data/http_zip_done"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			set developer 0
+			//resume connecting
+			set net_receiverate 1
+			set net_sendrate 1
+			//stop loop
+			set zip_exists_loop_gate 0
+			http_print $~mapname finished downloading.
+		}
+	}
+	//
+	sp_sc_cvar_sset ~f "sofplus/data/http_zip_not_exists"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		//stop the loop, no zip to download
+		set zip_exists_loop_gate 0
+		http_print No zip file exists
+	}
+}
+
+function filelist_exists_loop(*)
+{
+	//wait 20 seconds to download file
+	sp_sc_flow_if number cvar http_counter_exists < val 40000
+	{
+		add http_counter_exists 250
+		sp_sc_func_exec filelist_exists
+		sset ~cmd sp_sc_func_exec filelist_exists_loop #~1
+		sp_sc_timer 250 #~cmd
+	}
+}
+
+function filelist_exists(*)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_flist_exists"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		http_print File found. Downloading
+		disconnect
+		//stop loop
+		set http_counter_exists 40000
+		set http_counter_make 0
+		set http_counter_finished 0
+		set http_exists_loop_busy 0
+		sp_sc_flow_if text cvar http_finished_loop_busy == val 0
+		{
+			set http_finished_loop_busy 1
+			sp_sc_func_exec filelist_finished_loop aeo<3
+		}
+		
+		//"user/sofplus/addons/http_filelist_created.func"
+	}
+	//check if map is extracted early
+	sp_sc_flow_if text cvar ~1 != val "aeo<3"
+	{
+		sp_sc_cvar_sset ~f "maps/" $~1 ".bsp"
+		sp_sc_file_find ~ls $~f file 
+		sp_sc_flow_if number cvar ~ls_0 == val 1
+		{
+			//stop the loop so we stay connected
+			set http_exists_loop_busy 0
+			set http_counter_finished 1
+		}
+	}
+
+}
+
+function filelist_finished_loop(*)
+{
+	sp_sc_flow_if number cvar http_counter_finished == val 0
+	{
+		sp_sc_func_exec filelist_finished
+		sset ~cmd sp_sc_func_exec filelist_finished_loop #~1
+		sp_sc_timer 250 #~cmd
+	}
+}
+
+function filelist_finished(*)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_flist_finished"
+	sp_sc_file_find ~ls $~f file 
+	sp_sc_flow_if number cvar ~ls_0 == val 1
+	{
+		http_print Download completed
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+		echo "reconnect triggered!"
+		echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+		reconnect
+		//stop loop
+		set http_counter_finished 1
+		set ~l "AeO<3"
+		set http_finished_loop_busy 0
+		sp_sc_cvar_save http_done ~l
+		//trigger file deletion (infinite reconnect bug)
+
+	}
+}
+
+function onch_download(~cvar)
+{
+	sp_sc_cvar_sset ~f "sofplus/data/http_is_running"
+	sp_sc_file_find ~ls $~f file
+	sp_sc_flow_if number cvar ~ls_0 == val 0
+	{
+		sp_sc_cvar_copy ~x $~cvar
+		sp_sc_flow_if text cvar ~x == val "Downloading File"
+		{
+			//stop any 2 loops running
+			//we could be downloading the <hugemap>.zip still
+			set http_counter_exists 40000
+			set http_counter_finished 1
+			set http_finished_loop_busy 0
+			set http_exists_loop_busy 0
+			sp_sc_flow_if number cvar http_busy == val "0"
+			{
+				http_sp2curl $cl_download_filename
+			}
+		}	
+	}
+}
+
+function http_sp2curl(~file)
+{
+	//very small eal files sometimes clash
+	//we download the eal, while sof1 tries to rename to .tmp ... 
+	//but failure to rename error happens. 
+	sp_sc_cvar_list ~file
+	set ~dir #~file
+	sp_sc_cvar_random_int ~rand 1 1000000
+	sp_sc_cvar_sset ~saveas "http_tmp_" #~rand
+	sp_sc_cvar_save $~saveas ~dir
+	set http_counter_exists 0
+	sp_sc_flow_if text cvar http_exists_loop_busy == val 0
+	{
+		set http_exists_loop_busy 1
+		sp_sc_func_exec filelist_exists_loop aeo<3
+	}
+	
+	//user/sofplus/data/http_flist_exists
+}
+
+function http_print(~str,*)
+{
+	sset ~out "%03HTTP-DL: %01" $~str
+	sp_sc_cvar_unescape ~out ~out
+	set ~count 1
+	sp_sc_flow_while number cvar ~count <= val #~0
+	{
+		sp_sc_cvar_copy ~arg ~$~count
+		sp_sc_cvar_append ~out " " $~arg
+		add ~count 1 
+	}
+	echo #~out
+}
+
+function http_exists(~fname)
+{
+	sp_sc_file_find ~exists $~fname pak filesystem file recursive
+	sp_sc_flow_if number cvar ~exists_0 == val 0
+	{
+		//return the answer
+		set __http_exists__ 0
+	}
+	else
+	{
+		set __http_exists__ 1
+	}
+}
+
+function quick()
+{
+	//sp_sc_func_exec parse_find_map "dm/coop_pitia_house-=final=-"
+	sp_sc_func_exec parse_find_map "dm/aztec2"
+}
