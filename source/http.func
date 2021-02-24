@@ -95,6 +95,7 @@ function onch_state(~cvar)
 				set http_counter_finished 1
 				set http_counter_exists 40000
 				set _sp_cl_print 1
+				set developer 0
 
 			}
 		}
@@ -235,6 +236,7 @@ function zip_exists(~mapname)
 		//stop the loop, no zip to download
 		set zip_exists_loop_gate 0
 		http_print No zip file exists
+		set developer 0
 	}
 }
 
