@@ -10,11 +10,11 @@ to use the zip:
 - extract SOF PATINUM.zip to your SoF.exe folder
 - Start SoF-http-cl.exe and you're done
 
-Single-file downloads are now unsupported e.g. missing textures must be downloaded from the server.
-
 This client downloads zip files from here https://github.com/plowsof/sof1maps and extracts them while you connect to a server. You will not notice a thing. No more time wasted
 
-This client would not be possible without a select group of people who i'll mention in alphabetical order:
+files not in our database will still be downloaded from sof1 server
+
+This client / map files database would not be possible without a select group of people who i'll mention in alphabetical order:
 Acadie, A, Chin, d3nd3, O 
 
 - How are new maps added?
