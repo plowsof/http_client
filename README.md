@@ -15,7 +15,7 @@ This client downloads zip files from here https://github.com/plowsof/sof1maps an
 files not in our database will still be downloaded from sof1 server
 
 This client / map files database would not be possible without a select group of people who i'll mention in alphabetical order:
-Acadie, A, Chin, d3nd3, O 
+Acadie, A, Chin, Ctrl, d3nd3, O 
 
 But most important of all the mappers who spent hours upon hours creating content for us all to enjoy. Thank you!
 
