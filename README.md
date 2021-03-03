@@ -2,13 +2,11 @@
 
 Rough and ready / proof of concept - http client
 
-place .func file in user/sofplus/addons 
-
-
 to use the zip:
 
 - extract SOF PATINUM.zip to your SoF.exe folder
-- Start SoF-http-cl.exe and you're done
+- Start SoF-http-cl.bat and you're done
+- Create a shortcut for this .bat as it starts your SoF.exe with http downloads available
 
 This client downloads zip files from here https://github.com/plowsof/sof1maps and extracts them while you connect to a server. You will not notice a thing. No more time wasted
 
